@@ -14,12 +14,17 @@ export default function Leaderboard({ onBack }) {
         const API_URL = import.meta.env.VITE_API_URL || '';
         const response = await fetch(`${API_URL}/api/leaderboard`, { headers });
         
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+           throw new Error('API not found (Check VITE_API_URL)');
+        }
+        
         if (!response.ok) throw new Error('Failed to fetch leaderboard');
         
         const result = await response.json();
         setData(result);
       } catch (err) {
-        setError(err.message);
+        setError(err.message || 'Network error');
       } finally {
         setLoading(false);
       }

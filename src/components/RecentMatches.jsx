@@ -25,12 +25,17 @@ export default function RecentMatches({ onBack }) {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+           throw new Error('API not found (Check VITE_API_URL)');
+        }
+        
         if (!response.ok) throw new Error('Failed to fetch matches');
         
         const result = await response.json();
         setMatches(result);
       } catch (err) {
-        setError(err.message);
+        setError(err.message || 'Network error');
       } finally {
         setLoading(false);
       }

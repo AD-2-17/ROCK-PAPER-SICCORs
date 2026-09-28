@@ -17,6 +17,10 @@ export function AuthProvider({ children }) {
         headers: { 'Authorization': `Bearer ${storedToken}` }
       })
       .then(res => {
+        const contentType = res.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+           throw new Error('Invalid API response');
+        }
         if (!res.ok) throw new Error('Invalid token');
         return res.json();
       })
@@ -35,30 +39,51 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const handleResponse = async (res) => {
+    let data;
+    const contentType = res.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      data = await res.json();
+    } else {
+      const text = await res.text();
+      // If we got an empty response or HTML (like a 404/405 page from Vercel)
+      throw new Error(`Server error (${res.status}). If deployed, check your VITE_API_URL environment variable.`);
+    }
+    
+    if (!res.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  };
+
   const login = async (username, password) => {
-    const res = await fetch(`${API_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Login failed');
-    localStorage.setItem('dow_token', data.token);
-    setToken(data.token);
-    setUser(data.user);
+    try {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await handleResponse(res);
+      localStorage.setItem('dow_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+    } catch (err) {
+      throw new Error(err.message || 'Network error: could not reach backend');
+    }
   };
 
   const register = async (username, password) => {
-    const res = await fetch(`${API_URL}/api/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Registration failed');
-    localStorage.setItem('dow_token', data.token);
-    setToken(data.token);
-    setUser(data.user);
+    try {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await handleResponse(res);
+      localStorage.setItem('dow_token', data.token);
+      setToken(data.token);
+      setUser(data.user);
+    } catch (err) {
+      throw new Error(err.message || 'Network error: could not reach backend');
+    }
   };
 
   const logout = () => {
