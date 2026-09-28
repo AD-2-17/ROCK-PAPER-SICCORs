@@ -1,10 +1,16 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dbPath = path.join(__dirname, 'dogofwar.db');
+
+// On Vercel, use /tmp/ (only writable dir). Locally, use server/ dir.
+const IS_VERCEL = !!process.env.VERCEL;
+const dbPath = IS_VERCEL
+  ? path.join('/tmp', 'dogofwar.db')
+  : path.join(__dirname, 'dogofwar.db');
 
 const db = new Database(dbPath);
 db.pragma('journal_mode = WAL');

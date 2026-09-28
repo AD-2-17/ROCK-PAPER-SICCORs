@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import PollSocket from '../services/PollSocket';
 
 const SocketContext = createContext(null);
 
@@ -9,83 +10,142 @@ export function SocketProvider({ children }) {
   const socketRef = useRef(null);
   const [connected, setConnected] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
-  // Force re-render trigger when socket changes
   const [socketVersion, setSocketVersion] = useState(0);
 
   useEffect(() => {
     if (token) {
-      // Clean up any existing socket first
+      // Clean up any existing socket
       if (socketRef.current) {
-        socketRef.current.removeAllListeners();
-        socketRef.current.disconnect();
+        if (socketRef.current.removeAllListeners) socketRef.current.removeAllListeners();
+        if (socketRef.current.disconnect) socketRef.current.disconnect();
         socketRef.current = null;
       }
 
+      // Try WebSocket first, fall back to PollSocket for serverless environments
       const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || '';
-      const socket = io(SOCKET_URL, {
+      
+      const realSocket = io(SOCKET_URL, {
         autoConnect: false,
         reconnection: true,
-        reconnectionAttempts: 10,
+        reconnectionAttempts: 3,    // Only 3 attempts before giving up
         reconnectionDelay: 1000,
-        reconnectionDelayMax: 5000,
-        timeout: 10000,
+        timeout: 5000,              // 5s timeout
         transports: ['websocket', 'polling'],
       });
 
-      socketRef.current = socket;
+      let settled = false;
+      let fallbackTimer = null;
 
-      socket.on('connect', () => {
-        console.log('[Socket] Connected, authenticating...');
-        socket.emit('authenticate', { token });
+      const useSocket = (sock) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(fallbackTimer);
+        socketRef.current = sock;
+        setSocketVersion(v => v + 1);
+        sock.emit('authenticate', { token });
+      };
+
+      // Set up real socket handlers
+      realSocket.on('connect', () => {
+        console.log('[Socket] WebSocket connected');
+        useSocket(realSocket);
       });
 
-      socket.on('authenticated', (payload) => {
+      realSocket.on('authenticated', (payload) => {
         if (payload && payload.success !== false) {
           setConnected(true);
-          console.log('[Socket] Authenticated successfully');
-        } else {
-          setConnected(false);
-          console.warn('[Socket] Authentication failed');
+          console.log('[Socket] Authenticated via WebSocket');
         }
       });
 
-      socket.on('online-count', ({ count }) => {
+      realSocket.on('online-count', ({ count }) => {
         setOnlineCount(count);
       });
 
-      socket.on('disconnect', (reason) => {
+      realSocket.on('disconnect', (reason) => {
         console.log('[Socket] Disconnected:', reason);
         setConnected(false);
       });
 
-      socket.on('reconnect', (attemptNumber) => {
-        console.log('[Socket] Reconnected after', attemptNumber, 'attempts');
-      });
-
-      socket.on('connect_error', (err) => {
+      realSocket.on('connect_error', (err) => {
         console.warn('[Socket] Connection error:', err.message);
+        // If we haven't settled yet, fall back to polling
+        if (!settled) {
+          console.log('[Socket] WebSocket failed, switching to PollSocket (REST polling)');
+          settled = true;
+          clearTimeout(fallbackTimer);
+          realSocket.removeAllListeners();
+          realSocket.disconnect();
+
+          const poll = new PollSocket();
+          socketRef.current = poll;
+          setSocketVersion(v => v + 1);
+
+          poll.on('authenticated', (payload) => {
+            if (payload && payload.success !== false) {
+              setConnected(true);
+              console.log('[Socket] Authenticated via PollSocket');
+            }
+          });
+          poll.on('online-count', ({ count }) => {
+            setOnlineCount(count);
+          });
+
+          poll.emit('authenticate', { token });
+        }
       });
 
-      socket.connect();
-      setSocketVersion(v => v + 1);
+      // Fallback timer: if WebSocket doesn't connect within 4 seconds, use PollSocket
+      fallbackTimer = setTimeout(() => {
+        if (!settled) {
+          console.log('[Socket] WebSocket timeout, switching to PollSocket');
+          settled = true;
+          realSocket.removeAllListeners();
+          realSocket.disconnect();
+
+          const poll = new PollSocket();
+          socketRef.current = poll;
+          setSocketVersion(v => v + 1);
+
+          poll.on('authenticated', (payload) => {
+            if (payload && payload.success !== false) {
+              setConnected(true);
+              console.log('[Socket] Authenticated via PollSocket');
+            }
+          });
+          poll.on('online-count', ({ count }) => {
+            setOnlineCount(count);
+          });
+
+          poll.emit('authenticate', { token });
+        }
+      }, 4000);
+
+      realSocket.connect();
 
       return () => {
-        socket.removeAllListeners();
-        socket.disconnect();
-        socketRef.current = null;
+        settled = true;
+        clearTimeout(fallbackTimer);
+        if (socketRef.current) {
+          if (socketRef.current.removeAllListeners) socketRef.current.removeAllListeners();
+          if (socketRef.current.disconnect) socketRef.current.disconnect();
+          socketRef.current = null;
+        } else {
+          realSocket.removeAllListeners();
+          realSocket.disconnect();
+        }
         setConnected(false);
       };
     } else {
       if (socketRef.current) {
-        socketRef.current.removeAllListeners();
-        socketRef.current.disconnect();
+        if (socketRef.current.removeAllListeners) socketRef.current.removeAllListeners();
+        if (socketRef.current.disconnect) socketRef.current.disconnect();
         socketRef.current = null;
         setConnected(false);
       }
     }
   }, [token]);
 
-  // Memoize context value to prevent unnecessary re-renders
   const contextValue = React.useMemo(() => ({
     socket: socketRef.current,
     connected,
