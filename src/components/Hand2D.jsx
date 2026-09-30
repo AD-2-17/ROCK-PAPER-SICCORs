@@ -69,7 +69,6 @@ export function GameHand({
     x: 0,
     y: 0,
     rotate: 0,
-    scaleX: flipScale,
     scaleY: 1,
     opacity: 1,
   };
@@ -137,8 +136,11 @@ export function GameHand({
     filterGlow = 'drop-shadow(0 0 30px rgba(245, 158, 11, 0.7))';
   }
 
+  const isEntering = !hasEntered.current;
+
   return (
-    <div
+    <motion.div
+      key={`${displayChoice}-${animState}-${bouncePhase}`}
       style={{
         width: '100%',
         height: '100%',
@@ -147,30 +149,32 @@ export function GameHand({
         justifyContent: isOpponent ? 'flex-end' : 'flex-start',
         position: 'relative',
         zIndex: isRevealed ? 10 : 1,
+        transformOrigin: isOpponent ? '100% 100%' : '0% 100%',
       }}
+      initial={isEntering ? {
+        rotate: isOpponent ? 52 : -52,
+        opacity: 0,
+        scale: 0.92,
+      } : false}
+      animate={animateProps}
+      transition={isEntering
+        ? { duration: 0.9, ease: [0.22, 1, 0.36, 1] }
+        : transitionProps}
+      onAnimationComplete={() => { hasEntered.current = true; }}
     >
-      <motion.img
-        key={`${displayChoice}-${animState}-${bouncePhase}`} // Retrigger each countdown beat
+      <img
         src={assetSrc}
         alt={displayChoice}
         style={{
+          width: '100%',
           height: '100%',
-          width: 'auto',
           maxHeight: '100%',
           maxWidth: '100%',
           objectFit: 'contain',
-          transformOrigin: isOpponent ? '100% 100%' : '0% 100%',
+          transform: `scaleX(${flipScale})`,
           filter: filterGlow,
         }}
-        initial={hasEntered.current ? false : {
-          x: isOpponent ? 130 : -130,
-          rotate: isOpponent ? -14 : 14,
-          opacity: 0.45,
-        }}
-        animate={animateProps}
-        transition={transitionProps}
-        onAnimationComplete={() => { hasEntered.current = true; }}
       />
-    </div>
+    </motion.div>
   );
 }

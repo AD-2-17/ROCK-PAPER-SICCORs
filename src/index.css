@@ -354,6 +354,7 @@ body { background: var(--bg-primary); color: var(--text-primary); font-family: v
 }
 
 .game {
+  position: relative;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -477,8 +478,8 @@ body { background: var(--bg-primary); color: var(--text-primary); font-family: v
 .game__hand-wrapper {
   position: absolute;
   bottom: 0;
-  width: min(58vw, 900px);
-  height: min(66vh, 800px);
+  width: min(72vw, 1280px);
+  height: min(70vh, 780px);
   display: flex;
   align-items: flex-end;
 }
@@ -792,13 +793,13 @@ body { background: var(--bg-primary); color: var(--text-primary); font-family: v
   .game__choice { padding: 16px; min-width: 90px; }
   .game__choice-card { min-width: 90px; padding: 10px 12px 14px; }
   .game__choice-preview { height: 80px; }
-  .game__hand-wrapper { width: 62vw; height: min(48vh, 520px); }
+  .game__hand-wrapper { width: 66vw; height: min(50vh, 520px); }
   .game__countdown-word { font-size: clamp(2rem, 7vw, 3.5rem); }
 }
 @media (max-width: 480px) {
   .landing__hands { font-size: 3rem; gap: 24px; }
   .nav__links { display: none; }
-  .game__hand-wrapper { width: 68vw; height: min(40vh, 360px); }
+  .game__hand-wrapper { width: 64vw; height: min(42vh, 380px); }
   .game__choice-card { min-width: 80px; padding: 8px 10px 12px; }
   .game__choice-preview { height: 65px; }
 }
