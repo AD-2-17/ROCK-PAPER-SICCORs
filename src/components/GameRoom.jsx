@@ -9,7 +9,12 @@ const CHOICES = [
   { id: 'scissors', label: 'Scissors' },
 ];
 
-const COUNTDOWN_WORDS = ['ROCK', 'ROCK', 'ROCK', 'SHOOT!'];
+const COUNTDOWN_STEPS = [
+  { word: 'ROCK', hand: 'rock' },
+  { word: 'PAPER', hand: 'paper' },
+  { word: 'SCISSORS', hand: 'scissors' },
+  { word: 'SHOOT!' },
+];
 const BEAT_DURATION = 600; // ms per beat
 
 export default function GameRoom({ roomCode, opponent, user, onLeave }) {
@@ -112,14 +117,16 @@ export default function GameRoom({ roomCode, opponent, user, onLeave }) {
     setDisplayChoice('rock');
     setOpponentDisplayChoice('rock');
     
-    // ROCK - PAPER - SCISSORS - SHOOT!
-    COUNTDOWN_WORDS.forEach((word, i) => {
+    // Cycle the visible hands with the callout instead of holding rock until reveal.
+    COUNTDOWN_STEPS.forEach(({ word, hand }, i) => {
       const t = setTimeout(() => {
         setCountdownWord(word);
         setCountdownIndex(i);
         
         if (i < 3) {
-          // Bounce on each beat
+          setDisplayChoice(hand);
+          setOpponentDisplayChoice(hand);
+          // Start a fresh, gentle shake on each beat.
           setHandAnimState('bounce');
         }
         
@@ -211,8 +218,9 @@ export default function GameRoom({ roomCode, opponent, user, onLeave }) {
       </div>
 
       {/* Countdown Word Display */}
-      <AnimatePresence mode="wait">
-        {phase === 'countdown' && countdownWord && (
+      <div className="game__countdown-overlay" aria-live="polite">
+        <AnimatePresence mode="wait">
+          {phase === 'countdown' && countdownWord && (
           <motion.div
             key={countdownWord}
             className="game__countdown-word"
@@ -223,8 +231,9 @@ export default function GameRoom({ roomCode, opponent, user, onLeave }) {
           >
             {countdownWord}
           </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Player Info Bar */}
       <div className="game__players" style={{ zIndex: 20 }}>

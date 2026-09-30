@@ -476,9 +476,9 @@ body { background: var(--bg-primary); color: var(--text-primary); font-family: v
 }
 .game__hand-wrapper {
   position: absolute;
-  bottom: -10px;
-  width: clamp(300px, 42vw, 650px);
-  height: clamp(360px, 58vh, 750px);
+  bottom: 0;
+  width: min(58vw, 900px);
+  height: min(66vh, 800px);
   display: flex;
   align-items: flex-end;
 }
@@ -492,18 +492,21 @@ body { background: var(--bg-primary); color: var(--text-primary); font-family: v
 }
 
 /* Countdown word overlay */
-.game__countdown-word {
+.game__countdown-overlay {
   position: fixed;
-  top: 45%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 30;
+}
+.game__countdown-word {
+  text-align: center;
   font-family: var(--font-display);
   font-size: clamp(2.5rem, 8vw, 5rem);
   font-weight: 900;
   color: var(--accent-blue);
   text-shadow: 0 0 40px var(--accent-blue-glow), 0 0 80px rgba(59,130,246,0.2);
-  z-index: 30;
-  pointer-events: none;
   letter-spacing: 0.1em;
   white-space: nowrap;
 }
@@ -789,13 +792,13 @@ body { background: var(--bg-primary); color: var(--text-primary); font-family: v
   .game__choice { padding: 16px; min-width: 90px; }
   .game__choice-card { min-width: 90px; padding: 10px 12px 14px; }
   .game__choice-preview { height: 80px; }
-  .game__hand-wrapper { width: clamp(200px, 42vw, 320px); height: clamp(220px, 40vh, 380px); }
+  .game__hand-wrapper { width: 62vw; height: min(48vh, 520px); }
   .game__countdown-word { font-size: clamp(2rem, 7vw, 3.5rem); }
 }
 @media (max-width: 480px) {
   .landing__hands { font-size: 3rem; gap: 24px; }
   .nav__links { display: none; }
-  .game__hand-wrapper { width: clamp(160px, 45vw, 240px); height: clamp(180px, 35vh, 280px); }
+  .game__hand-wrapper { width: 68vw; height: min(40vh, 360px); }
   .game__choice-card { min-width: 80px; padding: 8px 10px 12px; }
   .game__choice-preview { height: 65px; }
 }

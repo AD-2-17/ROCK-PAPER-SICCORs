@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { motion } from 'framer-motion';
 
 const HAND_ASSETS = {
@@ -45,10 +45,12 @@ export function GameHand({
   animState = 'idle', // idle, bounce, anticipation, reveal, win, loss, draw
   bouncePhase = 0,
 }) {
+  const hasEntered = useRef(false);
   const isRevealed = animState === 'reveal' || animState === 'win' || animState === 'loss' || animState === 'draw';
   
-  // During prep / bounce phase, both players hold 'rock'
-  const displayChoice = isRevealed ? choice : 'rock';
+  // The countdown cycles through rock, paper, and scissors; the final selection
+  // is only locked in once the reveal begins.
+  const displayChoice = choice;
   const assetSrc = HAND_ASSETS[displayChoice] || HAND_ASSETS.rock;
 
   // Rock natively faces Right. Paper & Scissors natively face Left.
@@ -62,6 +64,7 @@ export function GameHand({
     flipScale = nativeFacesLeft ? -1 : 1;
   }
 
+  const inwardDirection = isOpponent ? -1 : 1;
   let animateProps = {
     x: 0,
     y: 0,
@@ -78,16 +81,20 @@ export function GameHand({
   };
 
   if (animState === 'idle') {
-    // Floating motion
-    animateProps.y = [0, -12, 0];
-    transitionProps = { duration: 3, repeat: Infinity, ease: 'easeInOut' };
+    // Hold at the screen edge after the one-time entrance.
+    animateProps.rotate = 0;
+    transitionProps = { type: 'spring', stiffness: 180, damping: 26 };
   } else if (animState === 'bounce') {
-    // Synchronized rhythmic pumping motion (up and down along the arm axis)
-    // Beat changes every 600ms
-    animateProps.y = [0, -60, 10, 0];
-    animateProps.x = [0, isOpponent ? -15 : 15, isOpponent ? 5 : -5, 0];
-    animateProps.rotate = [0, isOpponent ? 6 : -6, isOpponent ? -3 : 3, 0];
-    transitionProps = { duration: 0.52, times: [0, 0.35, 0.75, 1], ease: 'easeOut' };
+    // Each callout beat pivots around the wrist at the screen edge.
+    // Left swings inward clockwise; right mirrors it anti-clockwise.
+    animateProps.rotate = [0, inwardDirection * 11, inwardDirection * -2, 0];
+    animateProps.y = [0, -14, 2, 0];
+    animateProps.scaleY = [1, 1.018, 0.995, 1];
+    transitionProps = {
+      duration: 0.56,
+      times: [0, 0.42, 0.78, 1],
+      ease: [0.4, 0, 0.2, 1],
+    };
   } else if (animState === 'anticipation') {
     // Pull back before reveal
     animateProps.y = -40;
@@ -143,7 +150,7 @@ export function GameHand({
       }}
     >
       <motion.img
-        key={`${animState}-${bouncePhase}`} // Retrigger bounce on beat
+        key={`${displayChoice}-${animState}-${bouncePhase}`} // Retrigger each countdown beat
         src={assetSrc}
         alt={displayChoice}
         style={{
@@ -152,12 +159,17 @@ export function GameHand({
           maxHeight: '100%',
           maxWidth: '100%',
           objectFit: 'contain',
-          transformOrigin: 'bottom center',
+          transformOrigin: isOpponent ? '100% 100%' : '0% 100%',
           filter: filterGlow,
         }}
-        initial={false}
+        initial={hasEntered.current ? false : {
+          x: isOpponent ? 130 : -130,
+          rotate: isOpponent ? -14 : 14,
+          opacity: 0.45,
+        }}
         animate={animateProps}
         transition={transitionProps}
+        onAnimationComplete={() => { hasEntered.current = true; }}
       />
     </div>
   );
