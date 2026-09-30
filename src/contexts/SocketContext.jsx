@@ -37,18 +37,19 @@ export function SocketProvider({ children }) {
       let fallbackTimer = null;
 
       const useSocket = (sock) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(fallbackTimer);
-        socketRef.current = sock;
-        setSocketVersion(v => v + 1);
-        sock.emit('authenticate', { token });
+        if (!settled) {
+          settled = true;
+          clearTimeout(fallbackTimer);
+          socketRef.current = sock;
+          setSocketVersion(v => v + 1);
+        }
       };
 
       // Set up real socket handlers
       realSocket.on('connect', () => {
-        console.log('[Socket] WebSocket connected');
+        console.log('[Socket] WebSocket connected/reconnected');
         useSocket(realSocket);
+        realSocket.emit('authenticate', { token });
       });
 
       realSocket.on('authenticated', (payload) => {

@@ -271,6 +271,16 @@ app.post('/api/game/join-room', authMiddleware, (req, res) => {
     const host = room.players[0];
     const joiner = room.players[1];
 
+    if (global.io) {
+      const hostSocketId = userSockets.get(host.userId);
+      if (hostSocketId) {
+        const hostSocket = global.io.sockets.sockets.get(hostSocketId);
+        if (hostSocket && !hostSocket.rooms.has(roomCode)) hostSocket.join(roomCode);
+      }
+      global.io.to(host.userId).emit('match-ready', { roomCode, opponent: joiner.username });
+      global.io.to(joiner.userId).emit('match-ready', { roomCode, opponent: host.username });
+    }
+
     res.json({ roomCode, opponent: host.username });
   } catch (error) {
     console.error('Join room error:', error);
@@ -301,6 +311,10 @@ app.post('/api/game/choice', authMiddleware, (req, res) => {
 
     const opponentIndex = playerIndex === 0 ? 1 : 0;
     const opponent = room.players[opponentIndex];
+    
+    if (global.io) {
+      global.io.to(opponent.userId).emit('opponent-chose', {});
+    }
 
     // If both chose, compute result
     if (player.choice && opponent.choice) {
@@ -342,6 +356,12 @@ app.post('/api/game/choice', authMiddleware, (req, res) => {
           scores: { player: room.scores[room.players[1].userId], opponent: room.scores[room.players[0].userId] },
         },
       };
+      
+      if (global.io) {
+        global.io.to(room.players[0].userId).emit('round-result', room.lastResult[room.players[0].userId]);
+        global.io.to(room.players[1].userId).emit('round-result', room.lastResult[room.players[1].userId]);
+      }
+      
       room.state = 'result';
       // Reset choices (result is stored in lastResult)
       room.players[0].choice = null;
@@ -368,6 +388,9 @@ app.post('/api/game/play-again', authMiddleware, (req, res) => {
     if (playerIndex === -1) return res.status(400).json({ error: 'Not in room' });
 
     room.players[playerIndex].wantsRematch = true;
+    
+    const opponentIndex = playerIndex === 0 ? 1 : 0;
+    const opponent = room.players[opponentIndex];
 
     if (room.players[0].wantsRematch && room.players[1].wantsRematch) {
       room.players[0].choice = null;
@@ -377,6 +400,14 @@ app.post('/api/game/play-again', authMiddleware, (req, res) => {
       room.lastResult = null;
       room.state = 'playing';
       room.roundNumber = (room.roundNumber || 0) + 1;
+      
+      if (global.io) {
+        global.io.to(room.code).emit('new-round', {});
+      }
+    } else {
+      if (global.io) {
+        global.io.to(opponent.userId).emit('opponent-play-again', {});
+      }
     }
 
     res.json({ ok: true });
@@ -437,6 +468,17 @@ app.post('/api/game/find-match', authMiddleware, (req, res) => {
       rooms.set(roomCode, room);
       userRooms.set(p1.userId, roomCode);
       userRooms.set(p2.userId, roomCode);
+      
+      if (global.io) {
+        const p1SocketId = userSockets.get(p1.userId);
+        const p2SocketId = userSockets.get(p2.userId);
+        const s1 = p1SocketId ? global.io.sockets.sockets.get(p1SocketId) : null;
+        const s2 = p2SocketId ? global.io.sockets.sockets.get(p2SocketId) : null;
+        if (s1) s1.join(roomCode);
+        if (s2) s2.join(roomCode);
+        global.io.to(p1.userId).emit('match-ready', { roomCode, opponent: p2.username });
+        global.io.to(p2.userId).emit('match-ready', { roomCode, opponent: p1.username });
+      }
 
       const isP1 = userId === p1.userId;
       return res.json({
@@ -535,6 +577,7 @@ if (!IS_VERCEL) {
   const { Server } = await import('socket.io');
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, { cors: { origin: '*' } });
+  global.io = io;
 
   function broadcastOnlineCount() {
     io.emit('online-count', { count: userSockets.size });
@@ -606,13 +649,9 @@ if (!IS_VERCEL) {
 
       matchmakingQueue.push({ ...player });
 
-      if (matchmakingQueue.length >= 2) {
+      while (matchmakingQueue.length >= 2) {
         const p1 = matchmakingQueue.shift();
         const p2 = matchmakingQueue.shift();
-        const p1SocketId = userSockets.get(p1.userId);
-        const p2SocketId = userSockets.get(p2.userId);
-        if (!p1SocketId || !io.sockets.sockets.get(p1SocketId)) { matchmakingQueue.unshift(p2); return; }
-        if (!p2SocketId || !io.sockets.sockets.get(p2SocketId)) { matchmakingQueue.unshift(p1); return; }
 
         const roomCode = generateRoomCode();
         const room = {
@@ -624,10 +663,14 @@ if (!IS_VERCEL) {
         rooms.set(roomCode, room);
         userRooms.set(p1.userId, roomCode);
         userRooms.set(p2.userId, roomCode);
-        const s1 = io.sockets.sockets.get(p1SocketId);
-        const s2 = io.sockets.sockets.get(p2SocketId);
+        
+        const p1SocketId = userSockets.get(p1.userId);
+        const p2SocketId = userSockets.get(p2.userId);
+        const s1 = p1SocketId ? io.sockets.sockets.get(p1SocketId) : null;
+        const s2 = p2SocketId ? io.sockets.sockets.get(p2SocketId) : null;
         if (s1) s1.join(roomCode);
         if (s2) s2.join(roomCode);
+        
         io.to(p1.userId).emit('match-ready', { roomCode, opponent: p2.username });
         io.to(p2.userId).emit('match-ready', { roomCode, opponent: p1.username });
       }

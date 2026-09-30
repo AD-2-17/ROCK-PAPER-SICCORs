@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSocket } from '../contexts/SocketContext';
-import { GameHand, HandPreview } from './Hand3D';
+import { GameHand, HandPreview } from './Hand2D';
 
 const CHOICES = [
   { id: 'rock', label: 'Rock' },
@@ -9,7 +9,7 @@ const CHOICES = [
   { id: 'scissors', label: 'Scissors' },
 ];
 
-const COUNTDOWN_WORDS = ['ROCK', 'PAPER', 'SCISSORS', 'SHOOT!'];
+const COUNTDOWN_WORDS = ['ROCK', 'ROCK', 'ROCK', 'SHOOT!'];
 const BEAT_DURATION = 600; // ms per beat
 
 export default function GameRoom({ roomCode, opponent, user, onLeave }) {
@@ -248,7 +248,7 @@ export default function GameRoom({ roomCode, opponent, user, onLeave }) {
       {/* Game Arena */}
       <div className="game__arena" style={{ zIndex: 20, flex: 1, justifyContent: 'flex-end', paddingBottom: '40px' }}>
         
-        {/* CHOOSING / WAITING PHASE — 3D Choice Cards */}
+        {/* CHOOSING / WAITING PHASE — Choice Cards */}
         {(phase === 'choosing' || phase === 'waiting') && (
           <motion.div 
             className="game__choices"
@@ -262,13 +262,13 @@ export default function GameRoom({ roomCode, opponent, user, onLeave }) {
               return (
                 <button
                   key={c.id}
-                  className={`game__choice game__choice--3d ${isSelected ? 'game__choice--selected' : ''} ${isDimmed ? 'game__choice--dimmed' : ''}`}
+                  className={`game__choice game__choice-card ${isSelected ? 'game__choice--selected' : ''} ${isDimmed ? 'game__choice--dimmed' : ''}`}
                   onClick={() => handleChoice(c.id)}
                   disabled={phase !== 'choosing'}
                   onMouseEnter={() => setHoveredChoice(c.id)}
                   onMouseLeave={() => setHoveredChoice(null)}
                 >
-                  <div className="game__choice-3d-preview">
+                  <div className="game__choice-preview">
                     <HandPreview 
                       choice={c.id} 
                       isHovered={isHovered && !isSelected}

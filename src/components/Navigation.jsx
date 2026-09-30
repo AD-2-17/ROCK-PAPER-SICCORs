@@ -6,63 +6,34 @@ import { useSocket } from '../contexts/SocketContext';
 export default function Navigation({ currentPage, onNavigate }) {
   const { user, logout } = useAuth();
   const { connected, onlineCount } = useSocket();
+  const navigation = user
+    ? [['Home', 'lobby'], ['Recent matches', 'matches'], ['Leaderboard', 'leaderboard']]
+    : [['Home', 'landing'], ['Leaderboard', 'leaderboard']];
 
   return (
-    <motion.nav 
-      className="nav"
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.5, type: 'spring', stiffness: 120 }}
-    >
-      <div 
-        className="nav__logo" 
-        onClick={() => onNavigate(user ? 'lobby' : 'landing')}
-      >
-        DOG OF WAR
-      </div>
+    <motion.nav className="nav" initial={{ y: -36, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.45 }}>
+      <button className="nav__brand" onClick={() => onNavigate(user ? 'lobby' : 'landing')} aria-label="Go home">
+        <span className="nav__mark">D</span>
+        <span>DOG <strong>OF</strong> WAR</span>
+      </button>
 
-      <div className="nav__links">
-        {!user ? (
-          <>
-            <motion.button whileHover={{ scale: 1.05 }} className={`nav__link ${currentPage === 'landing' ? 'nav__link--active' : ''}`} onClick={() => onNavigate('landing')}>Home</motion.button>
-            <motion.button whileHover={{ scale: 1.05 }} className={`nav__link ${currentPage === 'leaderboard' ? 'nav__link--active' : ''}`} onClick={() => onNavigate('leaderboard')}>Leaderboard</motion.button>
-            <motion.button whileHover={{ scale: 1.05 }} className={`nav__link ${currentPage === 'about' ? 'nav__link--active' : ''}`} onClick={() => onNavigate('about')}>About</motion.button>
-          </>
-        ) : (
-          <>
-            <motion.button whileHover={{ scale: 1.05 }} className={`nav__link ${currentPage === 'lobby' ? 'nav__link--active' : ''}`} onClick={() => onNavigate('lobby')}>Lobby</motion.button>
-            <motion.button whileHover={{ scale: 1.05 }} className={`nav__link ${currentPage === 'matches' ? 'nav__link--active' : ''}`} onClick={() => onNavigate('matches')}>Matches</motion.button>
-            <motion.button whileHover={{ scale: 1.05 }} className={`nav__link ${currentPage === 'leaderboard' ? 'nav__link--active' : ''}`} onClick={() => onNavigate('leaderboard')}>Leaderboard</motion.button>
-          </>
-        )}
+      <div className="nav__links" aria-label="Main navigation">
+        {navigation.map(([label, page]) => (
+          <button key={page} className={`nav__link ${currentPage === page ? 'nav__link--active' : ''}`} onClick={() => onNavigate(page)}>
+            {label}
+          </button>
+        ))}
       </div>
 
       <div className="nav__auth">
         {!user ? (
-          <motion.button 
-            whileHover={{ scale: 1.05 }} 
-            className="btn btn--primary" 
-            onClick={() => onNavigate('login')}
-          >
-            LOGIN
-          </motion.button>
+          <button className="btn btn--primary nav__login" onClick={() => onNavigate('login')}>Log in</button>
         ) : (
           <>
-            <div className="nav__online">
-              <div className="nav__online-dot" style={{ backgroundColor: connected ? 'var(--accent-green)' : 'var(--text-muted)' }}></div>
-              {onlineCount} Online
-            </div>
-            <div className="nav__username">{user.username}</div>
-            <motion.button 
-              whileHover={{ scale: 1.05 }} 
-              className="btn btn--secondary" 
-              onClick={() => {
-                logout();
-                onNavigate('landing');
-              }}
-            >
-              LOGOUT
-            </motion.button>
+            <span className="nav__online"><i className={`nav__online-dot ${connected ? '' : 'nav__online-dot--offline'}`} />{onlineCount} online</span>
+            <button className="nav__wallet" type="button" aria-label="Dog balance">1,250 <strong>$DOG</strong></button>
+            <span className="nav__user">{user.username}</span>
+            <button className="nav__logout" onClick={() => { logout(); onNavigate('landing'); }}>Log out</button>
           </>
         )}
       </div>

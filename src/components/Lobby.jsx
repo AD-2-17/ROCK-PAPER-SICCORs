@@ -1,8 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useSocket } from '../contexts/SocketContext';
 
-export default function Lobby({ user, onMatchStart, onNavigate }) {
+const rules = [
+  ['Rock', 'beats scissors', 'rock'],
+  ['Paper', 'beats rock', 'paper'],
+  ['Scissors', 'beats paper', 'scissors'],
+];
+
+const liveWins = [
+  ['DogeMaster', '+1,250 $DOG', '12s ago'],
+  ['CryptoPaws', '+320 $DOG', '38s ago'],
+  ['ShibaSage', '+890 $DOG', '1m ago'],
+];
+
+export default function Lobby({ onMatchStart }) {
   const { socket, onlineCount } = useSocket();
   const [mode, setMode] = useState('idle');
   const [roomCode, setRoomCode] = useState('');
@@ -10,32 +22,16 @@ export default function Lobby({ user, onMatchStart, onNavigate }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!socket) return;
-
-    const handleRoomCreated = ({ roomCode }) => {
-      setRoomCode(roomCode);
-      setMode('waiting');
-    };
-
-    const handleMatchReady = ({ roomCode, opponent }) => {
-      onMatchStart({ roomCode, opponent });
-    };
-
-    const handleError = ({ message }) => {
-      setError(message);
-      setMode('idle');
-    };
-
-    const handleOpponentLeft = () => {
-      setMode('idle');
-      setError('Opponent disconnected');
-    };
+    if (!socket) return undefined;
+    const handleRoomCreated = ({ roomCode: createdCode }) => { setRoomCode(createdCode); setMode('waiting'); };
+    const handleMatchReady = ({ roomCode: matchedCode, opponent }) => onMatchStart({ roomCode: matchedCode, opponent });
+    const handleError = ({ message }) => { setError(message); setMode('idle'); };
+    const handleOpponentLeft = () => { setMode('idle'); setError('Opponent disconnected'); };
 
     socket.on('room-created', handleRoomCreated);
     socket.on('match-ready', handleMatchReady);
     socket.on('error', handleError);
     socket.on('opponent-left', handleOpponentLeft);
-
     return () => {
       socket.off('room-created', handleRoomCreated);
       socket.off('match-ready', handleMatchReady);
@@ -47,6 +43,11 @@ export default function Lobby({ user, onMatchStart, onNavigate }) {
   const handleFindMatch = () => {
     if (!socket) return;
     setError(null);
+    if (mode === 'searching') {
+      socket.emit('cancel-find');
+      setMode('idle');
+      return;
+    }
     socket.emit('find-match');
     setMode('searching');
   };
@@ -59,131 +60,100 @@ export default function Lobby({ user, onMatchStart, onNavigate }) {
   };
 
   const handleJoinRoom = () => {
-    if (!socket || !joinCode) return;
-    setError(null);
+    if (!socket) return;
     const normalized = joinCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (!normalized || normalized.length < 4) {
-      setError('Please enter a valid room code');
+    if (normalized.length < 4) {
+      setError('Enter a valid room code.');
       return;
     }
+    setError(null);
     socket.emit('join-room', { roomCode: normalized });
   };
 
   const handleCancel = () => {
     if (!socket) return;
-    if (mode === 'searching') {
-      socket.emit('cancel-find');
-    } else if (mode === 'waiting') {
-      socket.emit('leave-room');
-    }
+    socket.emit(mode === 'searching' ? 'cancel-find' : 'leave-room');
     setMode('idle');
   };
 
   return (
-    <div className="lobby">
-      <div className="lobby__header">
-        <h1 className="lobby__title">Game Lobby</h1>
-        <div className="lobby__online">
-          <span className="lobby__online-dot"></span>
-          {onlineCount} Players Online
-        </div>
-        <div style={{ marginTop: '1rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-          <button className="btn btn--ghost" onClick={() => onNavigate('leaderboard')}>Leaderboard</button>
-          <button className="btn btn--ghost" onClick={() => onNavigate('matches')}>Match History</button>
-        </div>
+    <main className="lobby">
+      <div className="lobby__scene" aria-hidden="true">
+        <img className="lobby__hand lobby__hand--rock" src="/assets/hands/rock.png" alt="" />
+        <img className="lobby__hand lobby__hand--scissors" src="/assets/hands/scissors.png" alt="" />
+        <img className="lobby__hand lobby__hand--paper" src="/assets/hands/paper.png" alt="" />
+        <span className="lobby__scene-word lobby__scene-word--rock">Rock</span>
+        <span className="lobby__scene-word lobby__scene-word--scissors">Scissors</span>
+        <span className="lobby__scene-word lobby__scene-word--paper">Paper</span>
       </div>
 
-      {error && (
-        <motion.div 
-          initial={{ opacity: 0, y: -10 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          style={{ color: '#ef4444', marginBottom: '1rem', textAlign: 'center' }}
-        >
-          {error}
-        </motion.div>
-      )}
+      <section className="lobby__content">
+        <header className="lobby__header">
+          <div className="lobby__crest" aria-hidden="true">D</div>
+          <p className="lobby__kicker"><i /> {onlineCount} players in the arena</p>
+          <h1 className="lobby__title">DOG <span>OF</span> WAR</h1>
+          <p className="lobby__subtitle">Choose a hand. Find an opponent. Take the round.</p>
+        </header>
 
-      <div className="lobby__actions">
-        {/* Card 1: Quick Match */}
-        <motion.div 
-          className="lobby__action-card"
-          whileHover={{ y: -4 }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0 }}
-        >
-          <div className="lobby__action-icon">⚔️</div>
-          <h3 className="lobby__action-title">Quick Match</h3>
-          <p className="lobby__action-desc">Find a random opponent</p>
-          
-          {mode === 'searching' ? (
-            <div className="lobby__searching">
-              <div>Searching for opponent...</div>
-              <button className="btn btn--secondary" onClick={handleCancel}>Cancel</button>
-            </div>
-          ) : (
-            <button className="btn btn--primary" onClick={handleFindMatch} disabled={mode !== 'idle'}>
-              FIND MATCH
-            </button>
+        <AnimatePresence>
+          {error && <motion.p className="lobby__error" initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>{error}</motion.p>}
+        </AnimatePresence>
+
+        <div className="lobby__actions">
+          <motion.button className={`lobby__action lobby__action--match ${mode !== 'idle' && mode !== 'searching' ? 'is-muted' : ''}`} type="button" onClick={handleFindMatch} whileTap={{ y: 3 }}>
+            <span className="lobby__action-icon">X</span>
+            <span><strong>{mode === 'searching' ? 'Searching...' : 'Find match'}</strong><small>{mode === 'searching' ? 'Tap to cancel' : 'Play a random opponent'}</small></span>
+          </motion.button>
+          <motion.button className="lobby__action lobby__action--room" type="button" onClick={() => setMode(mode === 'private' ? 'idle' : 'private')} whileTap={{ y: 3 }}>
+            <span className="lobby__action-icon">+</span>
+            <span><strong>Private room</strong><small>Create or enter a code</small></span>
+          </motion.button>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {mode === 'private' && (
+            <motion.section className="lobby__private" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="lobby__private-option">
+                <p className="lobby__section-label">Host a round</p>
+                <h2>Make a private room</h2>
+                <p>Share the generated code with one opponent.</p>
+                <button className="btn btn--primary" onClick={handleCreateRoom}>Create room</button>
+              </div>
+              <div className="lobby__private-option">
+                <p className="lobby__section-label">Join a round</p>
+                <h2>Enter a room code</h2>
+                <div className="lobby__join">
+                  <input aria-label="Room code" value={joinCode} onChange={(event) => setJoinCode(event.target.value)} placeholder="CODE" maxLength={6} />
+                  <button className="btn btn--secondary" onClick={handleJoinRoom} disabled={!joinCode}>Join</button>
+                </div>
+              </div>
+            </motion.section>
           )}
-        </motion.div>
 
-        {/* Card 2: Private Room */}
-        <motion.div 
-          className="lobby__action-card"
-          whileHover={{ y: -4 }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <div className="lobby__action-icon">🏰</div>
-          <h3 className="lobby__action-title">Private Room</h3>
-          <p className="lobby__action-desc">Create a room and share the code</p>
-          
-          {mode === 'creating' ? (
-            <div>Creating...</div>
-          ) : mode === 'waiting' ? (
-            <div className="lobby__waiting">
-              <div>Share this code:</div>
-              <div className="lobby__room-code">{roomCode}</div>
-              <div>Waiting for opponent...</div>
-              <button className="btn btn--secondary" onClick={handleCancel} style={{ marginTop: '0.5rem' }}>Cancel</button>
-            </div>
-          ) : (
-            <button className="btn btn--secondary" onClick={handleCreateRoom} disabled={mode !== 'idle'}>
-              CREATE ROOM
-            </button>
+          {(mode === 'creating' || mode === 'waiting') && (
+            <motion.section className="lobby__waiting" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }}>
+              {mode === 'creating' ? <><span className="spinner" /> Creating your room...</> : <><p className="lobby__section-label">Room code</p><strong className="lobby__room-code">{roomCode}</strong><p>Waiting for an opponent to join.</p><button className="btn btn--danger" onClick={handleCancel}>Cancel room</button></>}
+            </motion.section>
           )}
-        </motion.div>
 
-        {/* Card 3: Join Room */}
-        <motion.div 
-          className="lobby__action-card"
-          whileHover={{ y: -4 }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <div className="lobby__action-icon">🚪</div>
-          <h3 className="lobby__action-title">Join Room</h3>
-          <p className="lobby__action-desc">Enter a room code to join</p>
-          
-          <div className="lobby__room-input" style={{ display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
-            <input 
-              type="text" 
-              value={joinCode} 
-              onChange={(e) => setJoinCode(e.target.value)} 
-              placeholder="ROOM CODE" 
-              maxLength={6}
-              disabled={mode !== 'idle'}
-              style={{ padding: '0.5rem', textAlign: 'center', fontSize: '1.2rem', textTransform: 'uppercase' }}
-            />
-            <button className="btn btn--primary" onClick={handleJoinRoom} disabled={mode !== 'idle' || !joinCode}>
-              JOIN
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    </div>
+          {mode === 'idle' && (
+            <motion.div className="lobby__details" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <section className="lobby__panel">
+                <div className="lobby__panel-heading"><div><p className="lobby__section-label">Know the game</p><h2>Round rules</h2></div><span>First to react wins</span></div>
+                <div className="lobby__rules">
+                  {rules.map(([name, description, choice]) => <div className={`lobby__rule lobby__rule--${choice}`} key={choice}><img src={`/assets/hands/${choice}.png`} alt="" /><span><strong>{name}</strong><small>{description}</small></span></div>)}
+                </div>
+              </section>
+              <section className="lobby__panel lobby__wins">
+                <div className="lobby__panel-heading"><div><p className="lobby__section-label">Just now</p><h2>Live wins</h2></div><span>Real players. Real rounds.</span></div>
+                <div className="lobby__win-list">
+                  {liveWins.map(([name, amount, time]) => <div className="lobby__win" key={name}><span className="lobby__avatar">D</span><strong>{name}</strong><b>{amount}</b><small>{time}</small></div>)}
+                </div>
+              </section>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </section>
+    </main>
   );
 }
